@@ -4,7 +4,11 @@ An animated, hand-drawn pixel-art interpretation of the main entrance to Shahjal
 
 The complete artwork and application live in `index.html`. It uses Canvas 2D and optional Web Audio, with no external assets, tracking, dependencies, or build step. This is an artistic recreation, not an official university website.
 
-## View locally
+## Live website
+
+[View SUST — Campus in Pixels](https://sust-gate-pixelart.netlify.app/)
+
+## Local development
 
 Open `index.html` in a modern browser, or use Node.js 18 or newer:
 
@@ -12,7 +16,7 @@ Open `index.html` in a modern browser, or use Node.js 18 or newer:
 npm start
 ```
 
-Then open <http://127.0.0.1:8080>.
+The command prints the local preview address.
 
 ## Controls
 
@@ -38,6 +42,6 @@ npm test
 
 The dependency-free Node tests execute the page's actual inline JavaScript with mocked browser APIs and check pause/resume, reduced motion, keyboard controls, visibility, sound, and snapshot behavior. Browser checks cover rendering and responsive layout separately.
 
-## GitHub Pages
+## Hosting
 
-To publish this repository as a website, select **Settings → Pages → Deploy from a branch → main → / (root)**. `index.html` is already at the repository root. Uploading the source does not itself enable Pages.
+The live website is hosted on Netlify. The repository root contains the complete static site; no build command is required.

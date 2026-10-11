@@ -9,7 +9,14 @@ assert.ok(source, 'The page must contain its campus scene script.');
 
 // This harness runs the shipped script. It models browser scheduling rather than
 // exposing private scene state, so tests exercise the same public controls as users.
-function createScene({ reducedMotion = false, width = 1280, height = 900, padding = 18 } = {}) {
+function createScene({
+  reducedMotion = false, width = 1280, height = 900, padding = 18,
+  headerHeight = 23, footerHeight = 100, rowGap = 15,
+  visualViewport = true, viewportWidth = width, viewportHeight = height, viewportScale = 1,
+} = {}) {
+  const edges = typeof padding === 'number'
+    ? { left: padding, right: padding, top: padding, bottom: padding }
+    : { left: 0, right: 0, top: 0, bottom: 0, ...padding };
   const frames = new Map();
   const timers = new Map();
   const elements = new Map();
@@ -49,13 +56,16 @@ function createScene({ reducedMotion = false, width = 1280, height = 900, paddin
       this.tagName = tagName.toUpperCase();
       this.id = id;
       this.attributes = new Map();
-      this.style = {};
+      this.style = {
+        setProperty(name, value) { this[name] = String(value); },
+        getPropertyValue(name) { return this[name] || ''; },
+      };
       this.textContent = '';
       this.open = false;
       this.disabled = false;
       this.isContentEditable = false;
       this.clientWidth = width;
-      this.clientHeight = this.offsetHeight = id === 'app' ? 600 : tagName === 'header' ? 23 : tagName === 'footer' ? 100 : 0;
+      this.clientHeight = this.offsetHeight = id === 'app' ? 600 : tagName === 'header' ? headerHeight : tagName === 'footer' ? footerHeight : 0;
       this.parentElement = null;
       const classes = new Set();
       this.classList = {
@@ -86,9 +96,21 @@ function createScene({ reducedMotion = false, width = 1280, height = 900, paddin
     }
     querySelector(selector) { return querySelector(selector); }
     querySelectorAll(selector) { return [...elements.values()].filter(item => item.matches(selector)); }
+    get scrollHeight() {
+      if (this.id === 'app') {
+        const sceneWidth = parseFloat(elements.get('sceneFrame').style.width)
+          || parseFloat(this.style['--scene-width']) || parseFloat(this.style.width) || this.clientWidth;
+        return Math.ceil(headerHeight + footerHeight + rowGap * 2 + sceneWidth * 9 / 16);
+      }
+      return this.offsetHeight;
+    }
     getBoundingClientRect() {
-      const boxWidth = parseFloat(this.style.width) || this.clientWidth;
-      const boxHeight = this.id === 'scene' ? boxWidth * 9 / 16 : this.offsetHeight;
+      const boxWidth = parseFloat(this.style.width)
+        || (this.id === 'scene' ? parseFloat(elements.get('sceneFrame').style.width) : 0)
+        || (this.id === 'scene' || this.id === 'sceneFrame' ? parseFloat(elements.get('app').style['--scene-width']) : 0)
+        || (this.id === 'scene' || this.id === 'sceneFrame' ? parseFloat(elements.get('app').style.width) : 0)
+        || this.clientWidth;
+      const boxHeight = this.id === 'scene' || this.id === 'sceneFrame' ? boxWidth * 9 / 16 : this.id === 'app' ? this.scrollHeight : this.offsetHeight;
       return { left: 0, top: 0, right: boxWidth, bottom: boxHeight, width: boxWidth, height: boxHeight };
     }
     focus() { document.activeElement = this; }
@@ -202,6 +224,9 @@ function createScene({ reducedMotion = false, width = 1280, height = 900, paddin
   const header = new Element('header');
   const footer = new Element('footer');
   for (const element of elements.values()) element.parentElement = body;
+  header.parentElement = footer.parentElement = elements.get('app');
+  elements.get('sceneFrame').parentElement = elements.get('app');
+  elements.get('scene').parentElement = elements.get('sceneFrame');
   const querySelector = selector => selector === '.masthead' || selector === 'header' ? header :
     selector === '.scene-footer' || selector === 'footer' ? footer :
       selector === 'body' ? body : elements.get(selector.replace(/^#/, '')) || null;
@@ -218,8 +243,9 @@ function createScene({ reducedMotion = false, width = 1280, height = 900, paddin
   const requestAnimationFrame = callback => { const id = nextId++; frames.set(id, callback); return id; };
   const cancelAnimationFrame = id => frames.delete(id);
   const computedStyle = element => ({
-    paddingLeft: `${padding}px`, paddingRight: `${padding}px`, paddingTop: `${padding}px`, paddingBottom: `${padding}px`,
-    rowGap: '15px', gap: '15px', maxWidth: '1280px',
+    paddingLeft: `${element === body ? edges.left : 0}px`, paddingRight: `${element === body ? edges.right : 0}px`,
+    paddingTop: `${element === body ? edges.top : 0}px`, paddingBottom: `${element === body ? edges.bottom : 0}px`,
+    rowGap: `${rowGap}px`, gap: `${rowGap}px`, maxWidth: 'none',
     getPropertyValue(property) { return this[property.replace(/-([a-z])/g, (_, letter) => letter.toUpperCase())] || ''; },
     ...element.style,
   });
@@ -228,7 +254,7 @@ function createScene({ reducedMotion = false, width = 1280, height = 900, paddin
     matchMedia: () => media,
     requestAnimationFrame, cancelAnimationFrame,
     getComputedStyle: computedStyle, AudioContext,
-    visualViewport: Object.assign(new Events(), { width, height }),
+    visualViewport: visualViewport ? Object.assign(new Events(), { width: viewportWidth, height: viewportHeight, scale: viewportScale }) : null,
   });
   const context = vm.createContext({
     window, document, requestAnimationFrame, cancelAnimationFrame, getComputedStyle: computedStyle,
@@ -256,6 +282,18 @@ function createScene({ reducedMotion = false, width = 1280, height = 900, paddin
     },
     motion(matches) { media.matches = matches; media.emit('change', { matches }); },
     visibility(hidden) { document.hidden = hidden; document.emit('visibilitychange'); },
+    resizeViewport(nextWidth, nextHeight, { visualOnly = false } = {}) {
+      if (!visualOnly) {
+        window.innerWidth = document.documentElement.clientWidth = nextWidth;
+        window.innerHeight = document.documentElement.clientHeight = nextHeight;
+        window.emit('resize');
+      }
+      if (window.visualViewport) {
+        window.visualViewport.width = nextWidth;
+        window.visualViewport.height = nextHeight;
+        window.visualViewport.emit('resize');
+      }
+    },
     async finishAudioResume() { assert.ok(pendingResume, 'AudioContext.resume must be pending.'); pendingResume(); await Promise.resolve(); await Promise.resolve(); },
     failBlob() { blobFailure = true; },
     runTimers() { const ready = [...timers.values()]; timers.clear(); for (const { callback } of ready) callback(); },
@@ -426,4 +464,77 @@ test('the scene fits a narrow viewport and respects its available padded width',
     assert.ok(appWidth <= 320 - padding * 2, `App width ${appWidth}px exceeds available ${320 - padding * 2}px.`);
   }
   assert.match(html, /role="group"\s+aria-label="Campus scene controls"/, 'Ordinary Tab navigation should use group semantics.');
+});
+
+test('desktop fitting expands past 1280px while keeping the complete page in the viewport', () => {
+  const width = 2560, height = 1440, padding = 24;
+  const scene = createScene({ width, height, padding });
+  const sceneWidth = scene.elements.get('sceneFrame').getBoundingClientRect().width;
+  const availableWidth = width - padding * 2;
+  const availableSceneHeight = height - padding * 2 - 23 - 100 - 15 * 2;
+  assert.ok(sceneWidth > 1280, `A large desktop should use more than 1280px; got ${sceneWidth}px.`);
+  assert.equal(parseFloat(scene.elements.get('app').style.width), availableWidth,
+    'The header and controls should retain the full available width.');
+  assert.ok(sceneWidth <= availableWidth);
+  assert.ok(sceneWidth * 9 / 16 <= availableSceneHeight);
+  assert.ok(sceneWidth >= Math.min(availableWidth, availableSceneHeight * 16 / 9) * .98,
+    'The scene should use the available screen space.');
+});
+
+test('narrow and short landscape screens account for measured chrome and asymmetric safe-area padding', () => {
+  for (const options of [
+    { width: 320, height: 700, padding: { left: 12, right: 22, top: 16, bottom: 34 }, headerHeight: 30, footerHeight: 90, rowGap: 10 },
+    { width: 844, height: 390, padding: { left: 44, right: 20, top: 8, bottom: 28 }, headerHeight: 20, footerHeight: 48, rowGap: 6 },
+    { width: 1280, height: 600, padding: { left: 18, right: 18, top: 10, bottom: 10 }, headerHeight: 26, footerHeight: 60, rowGap: 8 },
+  ]) {
+    const scene = createScene(options);
+    const sceneWidth = scene.elements.get('sceneFrame').getBoundingClientRect().width;
+    const { width, height, padding, headerHeight, footerHeight, rowGap } = options;
+    const availableWidth = width - padding.left - padding.right;
+    const availableSceneHeight = height - padding.top - padding.bottom - headerHeight - footerHeight - rowGap * 2;
+    assert.ok(sceneWidth > 0);
+    assert.ok(sceneWidth <= availableWidth, `${width}×${height}: scene exceeds the padded width.`);
+    assert.ok(sceneWidth * 9 / 16 <= availableSceneHeight, `${width}×${height}: header, scene and controls exceed the padded height.`);
+    assert.ok(sceneWidth >= Math.min(availableWidth, availableSceneHeight * 16 / 9) * .98,
+      `${width}×${height}: available space should be used.`);
+  }
+});
+
+test('visual viewport dimensions and resize events refit a paused scene when visible height shrinks', () => {
+  const scene = createScene({ reducedMotion: true, width: 1024, height: 900, viewportWidth: 820, viewportHeight: 700 });
+  const frame = scene.elements.get('sceneFrame');
+  const initialWidth = frame.getBoundingClientRect().width;
+  assert.ok(initialWidth <= 820 - 36, 'Initial fitting should use the visual viewport width.');
+  const painted = scene.screen.count;
+  scene.resizeViewport(820, 340, { visualOnly: true });
+  scene.frame();
+  const resizedWidth = frame.getBoundingClientRect().width;
+  assert.ok(resizedWidth < initialWidth, 'The scene must shrink when browser UI reduces the visible height.');
+  assert.ok(resizedWidth * 9 / 16 + 23 + 100 + 30 <= 340 - 36);
+  assert.equal(scene.screen.count, painted, 'Resizing a paused scene should not restart its animation.');
+  assert.equal(scene.elements.get('pauseLabel').textContent, 'PLAY');
+});
+
+test('fitting falls back to the document viewport when VisualViewport is unavailable', () => {
+  const scene = createScene({ reducedMotion: true, width: 1440, height: 900, visualViewport: false });
+  const initialWidth = scene.elements.get('sceneFrame').getBoundingClientRect().width;
+  scene.resizeViewport(640, 400);
+  scene.frame();
+  const resizedWidth = scene.elements.get('sceneFrame').getBoundingClientRect().width;
+  assert.ok(resizedWidth < initialWidth);
+  assert.ok(resizedWidth <= 640 - 36);
+  assert.ok(resizedWidth * 9 / 16 + 23 + 100 + 30 <= 400 - 36);
+});
+
+test('pinch zoom preserves the layout viewport instead of shrinking the page underneath the user', () => {
+  const scene = createScene({
+    reducedMotion: true, width: 1600, height: 1000,
+    viewportWidth: 800, viewportHeight: 500, viewportScale: 2,
+  });
+  const initialWidth = scene.elements.get('sceneFrame').getBoundingClientRect().width;
+  assert.ok(initialWidth > 800 - 36, 'The scene should retain its layout size at 2× zoom.');
+  assert.equal(parseFloat(scene.elements.get('app').style.width), 1600 - 36);
+  scene.resizeViewport(600, 400, { visualOnly: true });
+  scene.frame();
+  assert.equal(scene.elements.get('sceneFrame').getBoundingClientRect().width, initialWidth);
 });
