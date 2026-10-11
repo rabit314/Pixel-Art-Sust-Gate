@@ -467,20 +467,6 @@ dialog .dialog-footnote{font-size:10px;color:#7f9490;margin-bottom:0}
     if(light>.15){c.globalAlpha=light*.08;poly([[34,-13],[55,-7],[55,-1],[34,-10]],p.light);c.globalAlpha=light;rect(33,-13,2,2,p.light);c.globalAlpha=1;}
     c.restore();
   }
-  function avenueCng(x,y,t,p,scale) {
-    const v=cngColors();c.save();c.translate(Math.round(x),Math.round(y));c.scale(scale,scale);
-    ellipse(0,4,17,3,'#263b3448');
-    rect(-14,-5,5,8,p.trunk[0]);rect(9,-5,5,8,p.trunk[0]);
-    poly([[-15,-8],[-15,-26],[-11,-33],[-5,-35],[9,-35],[14,-30],[17,-8]],v.roof);
-    poly([[-11,-28],[-6,-31],[8,-31],[12,-27],[12,-17],[-11,-17]],v.glass);
-    line(-1,-30,-1,-17,v.roof,2);line(-9,-26,-3,-28,p.concrete[3]);line(3,-26,10,-28,p.concrete[3]);
-    poly([[-15,-16],[14,-16],[17,-7],[12,-3],[-12,-3],[-16,-8]],v.body);
-    rect(-13,-15,26,2,v.bright);rect(-10,-12,6,4,p.concrete[3]);rect(5,-12,6,4,p.concrete[3]);
-    rect(-3,-12,6,5,p.trunk[0]);rect(-2,-11,4,1,v.mesh);rect(-12,-6,25,2,p.concrete[2]);
-    rect(-11,-15,4,1,p.gold[1]);rect(8,-15,4,1,p.gold[1]);rect(-2,-5,4,2,p.gold[1]);
-    ellipse(0,0,4,6,p.trunk[0]);ellipse(0,0,2,4,p.concrete[2]);line(-3,-5,0,-8,v.bright,2);
-    c.restore();
-  }
   function birds(t) {
     if(blend[2]>.6||state.rain>.7)return;
     for(let i=0;i<5;i++){const x=mod(t*(7+i*.2)+i*26+80,760)-60,y=96+Math.sin(t*.4+i*.8)*7+i*2,flap=Math.sin(t*6+i)>.1?-2:1;line(x-3,y+flap,x,y,'#354e53');line(x,y,x+3,y+flap,'#354e53');}
@@ -517,10 +503,6 @@ dialog .dialog-footnote{font-size:10px;color:#7f9490;margin-bottom:0}
     birds(t);
     // Leaves move gently while the architectural geometry stays perfectly still.
     for(let i=0;i<13;i++){const x=mod(noise(i,2,86)*W+t*(2+noise(i,6,2)*3),W),y=mod(noise(i,8,27)*175+t*(1.7+i*.06),285);if(y>110&&x>125){rect(x,y,2,1,p.leaf[4]);if(i%3===0)rect(x+1,y+1,1,1,p.leaf[2]);}}
-    if(state.gate>.65){
-      const v=mod(t*.015+.1,1),yy=236+v*45,xx=406+GATE_OFFSET-8*v;avenueCng(xx,yy,t,p,.32+v*.48);
-      for(let i=0;i<3;i++){const a=mod(t*.012+i*.31,1);person(407+GATE_OFFSET+Math.sin(i*4)*10,244+a*24,t+i,'#c09f79',i%2===0,state.rain>.55);}
-    }
     drawGates(p);
     const walkers=[['#b7734d',22,0.9,279],['#c8bc7e',177,-.75,277],['#6796a0',351,.8,282],['#9683a8',519,-.6,284]];
     for(let i=0;i<walkers.length;i++){const [shirt,start,v,y]=walkers[i],x=mod(start+t*v,580)+23;person(x,y,t+i*2,shirt,i%2===0,state.rain>.55,v);}
